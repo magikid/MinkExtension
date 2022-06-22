@@ -12,6 +12,7 @@ namespace Behat\MinkExtension\ServiceContainer\Driver;
 
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\DependencyInjection\Definition;
+use function var_dump;
 
 /**
  * @author Christophe Coevoet <stof@notk.org>
@@ -68,18 +69,20 @@ class GoutteFactory implements DriverFactory
             );
         }
 
-        if ($this->isGoutte1()) {
-            $guzzleClient = $this->buildGuzzle3Client($config['guzzle_parameters']);
+        if ($this->isGoutte2()) {
+            $guzzleClient = $this->buildGuzzle6Client($config['guzzle_parameters']);
+            $clientDefinition = new Definition('Behat\Mink\Driver\Goutte\Client');
         } elseif ($this->isGuzzle6()) {
             $guzzleClient = $this->buildGuzzle6Client($config['guzzle_parameters']);
+        } elseif ($this->isGoutte1()) {
+            $guzzleClient = $this->buildGuzzle3Client($config['guzzle_parameters']);
+            $clientDefinition = new Definition('Behat\Mink\Driver\Goutte\Client', array(
+                $config['server_parameters'],
+            ));
+            $clientDefinition->addMethodCall('setClient', array($guzzleClient));
         } else {
             $guzzleClient = $this->buildGuzzle4Client($config['guzzle_parameters']);
         }
-
-        $clientDefinition = new Definition('Behat\Mink\Driver\Goutte\Client', array(
-            $config['server_parameters'],
-        ));
-        $clientDefinition->addMethodCall('setClient', array($guzzleClient));
 
         return new Definition('Behat\Mink\Driver\GoutteDriver', array(
             $clientDefinition,
@@ -117,11 +120,13 @@ class GoutteFactory implements DriverFactory
         $refl = new \ReflectionParameter(array('Goutte\Client', 'setClient'), 0);
 
         $type = $refl->getType();
-        if ($type instanceof \ReflectionNamedType && 'Guzzle\Http\ClientInterface' === $type->getName()) {
-            return true;
-        }
+        return $type instanceof \ReflectionNamedType && 'Guzzle\Http\ClientInterface' === $type->getName();
+    }
 
-        return false;
+    private function isGoutte2()
+    {
+        $refl = new \ReflectionClass('Goutte\Client');
+        return !$refl->hasMethod('setClient');
     }
 
     private function isGuzzle6()
